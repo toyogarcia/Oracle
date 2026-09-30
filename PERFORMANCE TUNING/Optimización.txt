@@ -1,0 +1,58 @@
+Planes de ejecución:
+	EXPLAIN_PLAN
+		crear plan de ejecución: EXPLAIN PLAN FOR select * from dual
+		mostrar el plan de ejecución: select * from table(dbms_xplan.display_cursor(null, null,'LAST ALLSTATS +COST'))
+		
+	V$SQL
+		Ver consultas analizadas y listas en la memoria caché de biblioteca (library cache).
+		Identificar planes de ejecución diferenciados por versión de cursor (CHILD_NUMBER).
+		Analizar consumo de recursos por sentencia (BUFFER_GETS, CPU_TIME, DISK_READS).
+		
+			SELECT sql_id, child_number, executions, buffer_gets, disk_reads, substr(sql_text, 1, 100) as query_text
+			FROM v$sql
+			WHERE executions > 0
+			ORDER BY buffer_gets DESC
+			FETCH FIRST 10 ROWS ONLY;
+	
+	V$SQL_PLAN
+		almacena los planes de ejecución de las sentencias SQL que ya están cargadas en la caché de la biblioteca (library cache).
+		Muestra el plan real usado en memoria (considerando binders y entorno actual, a diferencia de EXPLAIN PLAN).
+		
+			SELECT id, sql_id, operation, options, object_name, cost
+			FROM v$sql_plan
+			WHERE child_number = 0
+			ORDER BY id;
+
+			Formato legible:
+			SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('dytp1z6ydztpb', 0, 'ALL'));
+	
+Indexación
+	B-TREE
+	BITMAP
+	INDICES BASADOS EN FUNCIONES
+	
+PARTTICIONADO
+	RANGO
+	LISTA
+	HASH
+	Operaciones de PARTITION EXCHANGE
+		Exchange Partition permite cargar en tablas particionadas datos en forma rápida y con muy poco impacto para los usuarios que se encuentran activos.
+		En resumen, lo que hace la sentencia Exchange Partition es modificar el diccionario de datos y simular que los datos que ya tenemos cargados en una tabla, corresponden a una partición determinada de otra tabla.
+		
+	https://lhorikian.blogspot.com/2007/09/exchange-partition.html
+	
+BULK COLLECT (FOR ALL)
+
+BLOQUEOS 
+	LOCKS
+	DEADLOCKS
+	FOR UPDATE NOWAIT
+	SKIP LOCKED
+		En Oracle, la cláusula FOR UPDATE SKIP LOCKED sirve para leer y bloquear filas de una tabla omitiendo aquellas que ya están bloqueadas por otra transacción, evitando que los procesos se queden esperando (block/wait)
+		
+	
+PAQUETES NATIVOS
+	DBMS_PARALLEL_EXECUTE -> Trocear cargas masivas
+	DBMS_SCHEDULER -> Automatización
+	
+	

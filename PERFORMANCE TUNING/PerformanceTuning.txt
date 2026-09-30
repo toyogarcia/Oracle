@@ -1,0 +1,1021 @@
+Hay dos tipos de plan:
+EXPLAIN: no ejecuta la query, es una prediccion de como se ejecutará 
+EXECUTION: Cuando se hacer performance tuning se necesita el execution plan. Se obtiene con SQLMonitor, DBMS_Xplan, traceando la query, etc
+
+Leyendo el plan de ejecucion hay 3 tipos de operaciones:
+Single-child operations: tienen exactamente una operacion bajo ella. (operaciones de tipo order by, group , agregating......)
+Multi-child  operations: tienen uno o mas data sources (operaciones como union)
+Join         operations: cada join es el padre de dos hijos y cada uno de ellos pueden ser otro join, tablas ,etc.
+
+Lo mas optimo es empezar uniendo las tablas con menor número de registros.
+La primera tabla accedida es la que esta mas arriba en el plan y la siguiente la que esta bajo esta y asi........en ese orden se hacen las operaciones.
+	Excepción: Con scalar-subquerys la primera tabla que aparece de arriba a abajo no es la primera accedida.
+			   Si tienes una select en la select de la query la base de datos primero trae todas las filas de la query principal y entonces pasa los valores a la subquery.
+			   
+			   select (select ........from tablaB)
+			   from tablaA
+						
+				En el plan aparecerá que primero accede a tablaB pero en realidad accede primero a tablaA y pasa los resultados a la subquery
+
+El optimizador estima el numero de filas de cada tabla basandose en las estadisticas.
+
+
+Get a Basic Plan with DBMS_XPlan
+You can get the execution plan for a query using DBMS_XPlan. The table function DISPLAY_CURSOR fetches the plan from memory for the requested SQL statement.
+
+Run this to get the execution plan for the join:
+	select *
+	from   bricks b
+	join   colours c
+	using ( colour );
+
+	Para sacar el SQL_ID:	
+		select sql_id, sql_text
+		from   v$sql
+		where  sql_text like 'select%bricks b%'
+		/* exclude the current query */
+		and    sql_text not like '%not this%';
+	
+	Consultamos el plan:
+		SELECT * FROM table(DBMS_XPLAN.DISPLAY_CURSOR('9wycqz711j959', NULL, 'TYPICAL'));
+
+	Tambien deberia funcionar con: select plan.* from   dbms_xplan.display_cursor( '9wycqz711j959' ) plan;
+								   select * from table(dbms_xplan.display_awr('9wycqz711j959', null, null, 'ALL'));
+								   Pero sin typical no me funciona y esto es porque la salida que genera es muy grande para SQLDeveloper, TOAD, etc.
+								   
+Using SQL ID in DBMS_XPlan
+
+	If you know the SQL ID for a statement, you can pass it directly to DBMS_XPlan:
+	This is handy if you want to get the plan for a statement running in a different session.
+	If you don't know the SQL ID, but have the statement's text, you can lookup its SQL ID and pass it to DBMS_XPlan in one statement with this query:								   
+	
+		select /* colours query */* from colours;
+
+		select p.*
+		from   v$sql s, 
+			   dbms_xplan.display_cursor (
+				 s.sql_id, s.child_number, 'BASIC'
+			   ) p
+		where  s.sql_text like '%colours query%'  /* enter text from the target statement here */
+		and    s.sql_text not like '%not this%'; /* exclude current statement */
+		
+
+View Rows Processed in the Plan
+
+	A basic plan only gives you its shape. To assess whether the plan is good, you need to see the number of rows flowing out of each step of the plan.
+	You do this with the format parameter of DBMS_XPlan. Using ROWSTATS adds the estimated and actual number of rows to each step.
+	You should also specify which execution details you want. Control this with LAST or ALL:
+				LAST - Only display the stats for the last execution.
+				ALL - Cumulative stats for every execution. This is the default.		
+				
+			Ejemplo obteniendo las filas estimadas:
+					select /* query3 */ /*+ gather_plan_statistics */ *
+					from   bricks b
+					join   colours c
+					using ( colour );
+
+					select p.*
+					from   v$sql s, 
+						   dbms_xplan.display_cursor (
+							 s.sql_id, s.child_number, format => 'ROWSTATS LAST'
+						   ) p
+					where  s.sql_text like '%query3%'  /* enter text from the target statement here */
+					and    s.sql_text not like '%not this%'; /* exclude current statement */
+				
+			Ejemplo obteniendo todas las filas (estimadas y totales):
+					alter session set statistics_level = all 
+
+					select /* query4 */ /*+ gather_plan_statistics */ *
+					from   bricks b
+					join   colours c
+					using ( colour );
+
+					select p.*
+					from   v$sql s, 
+						   dbms_xplan.display_cursor (
+							 s.sql_id, s.child_number, format => 'ROWSTATS LAST'
+						   ) p
+					where  s.sql_text like '%query4%'  /* enter text from the target statement here */
+					and    s.sql_text not like '%not this%'; /* exclude current statement */
+			
+			
+The Starts Statistic
+
+	the database reads each table once during execution. In some queries the database will read the same table many times.
+	To check this, look at the Starts column included in the row stats. This states how many times the operation began while the query was running.
+	
+	Check with scalar subquery:
+			select /* query5 */ /*+ gather_plan_statistics */c.rgb_hex_value,
+		   ( select count (*)
+			 from   bricks b
+			 where  b.colour = c.colour 
+		   ) brick#
+			from   colours c;
+			
+			select p.*
+			from   v$sql s, 
+				   dbms_xplan.display_cursor (
+					 s.sql_id, s.child_number, format => 'ROWSTATS LAST'
+				   ) p
+			where  s.sql_text like '%query5%'  /* enter text from the target statement here */
+			and    s.sql_text not like '%not this%'; /* exclude current statement */
+
+
+
+
+TEMA 2: What are Database Statistics?
+
+Como calcula el optimizador la Cardinalidad de los ladrillos azules: (Numero de ladrillos azules / numero de colores de ladrillos diferentes) * numero total de ladrillos
+El optimizador utiliza este calculo para todas las tablas de la query para elegir el plan a utilizar.
+
+Correlation:
+	Tengo tablas de formas y colores,
+	Si busco un color tengo la estimacion.
+	Si busco una forma tengo la estimacion.
+	Si busco una combinacion de forma y color , puede devolverla si existe o no devolver nada.
+
+	Colores: Hay tres colores, la selectividad es 1/3
+	Formas : Hay tres formas, la selectividad es 1/3
+
+	Si busco una combinacion de forma y color multiplica las dos selectividades 1/3 * 1/3 = 1/9
+	1/9 * Total rows = 1/9 * 9 = 1 (row estimate)
+
+	Nunca voy a obtener ese numero de 1 al buscar por color y forma, voy a obtener 3 o 0.
+	Para solucionarlo se crean extended statistics.
+
+	Extended statistics: capture relationships between columns. Calcula las combinaciones.
+
+Skew
+	Value Skew:
+		Uneven spread in your values (distribucion desigual en tus valores)
+		Si tengo mas ladrillos rojos que azules y verdes no funciona la formula de dividir 1/numero de colores distintos ya la distribucion (numero de registros) de cada color es diferente.
+		Para solucionarlo se almacena el número de ladrillos de cada color, eso da un histograma de fecuencia.
+		Cada valor se almacena en un bucket.
+		Hay un limite en el numero de buckets que se puede crear en cada columna, si el numero de valores distintos es mayor que el numero de buckets no podemos almacenar cuantas filas hay para cada valor.
+		
+		TOP-N histogram -> Solo aparecen los top common values. Los valores que no son frecuentes se pueden ignorar.
+		
+		Height-Balance Histogram: Si el numero de valores no frecuentes empieza a aumentar, necesitamos incluir ese valor en los buckets y ahora cada bucket en lugar  de contener un valor , contendrá un rango de valores.
+								  Se dividen los valores para que cada bucket tenga el mismo numero de filas.
+								  El optimizador ahora sabe cuantos valores hay en cada bucket  y cual es el máximo valor en cada uno. 
+								  Pero no sabemos el numero de filas por bucket para cada valor, esto hace que sobreestimemos valores poco comunes o subestimemos valores que se dan mucho.
+								  Truco para solucionarlo - "Hybrid Histogram": Los valores que estan combinados pueden reorganizarse de modo que se minimice el numeor de buckets con valores combinados y almacenar la frecuencia de valores.
+								  
+		Los histogramas tienen sentido para distribuciones desiguales en valores.
+
+	Range Skew:
+		Distribucion desigual entre los valores.
+		Valores garantizados que son unicos: pero si se  eliminan filas y se pregunta por ellas no aparece nada.
+		Se crean histogramas para missing values
+	
+
+Viewing Table Stats
+	You can query dictionary views to see the current stats for a table. Key statistics are:
+
+	The total number of rows in a table
+	The number of distinct (different) values in each column
+	The high and low values for each column
+
+	Use this query to get these values for all the columns in the current schema:
+	
+		select ut.table_name, ut.num_rows, 
+		   utcs.column_name, utcs.num_distinct, 
+		   case utc.data_type
+			 when 'VARCHAR2' then
+			   utl_raw.cast_to_varchar2 ( utcs.low_value ) 
+			when 'NUMBER' then
+			   to_char ( utl_raw.cast_to_number ( utcs.low_value ) )
+		   end low_val, 
+		   case utc.data_type
+			 when 'VARCHAR2' then
+			   utl_raw.cast_to_varchar2 ( utcs.high_value ) 
+			 when 'NUMBER' then
+			   to_char ( utl_raw.cast_to_number ( utcs.high_value ) )
+		   end high_val
+			from   user_tables ut
+			join   user_tab_cols utc
+			on     ut.table_name = utc.table_name
+			join   user_tab_col_statistics utcs
+			on     ut.table_name = utcs.table_name
+			and    utc.column_name = utcs.column_name
+			where  ut.table_name in ( 'COLOURS', 'BRICKS' )
+			order  by ut.table_name, utcs.column_name;
+	
+	To update the statistics on a table, call the GATHER_TABLE_STATS routine in DBMS_stats:
+		exec dbms_stats.gather_table_stats ( null, 'colours' ) ;
+		
+After large batch processes
+	If you insert, update or delete more than ten percent of the rows in a table it's likely there's a big mismatch between the stats and the real data. 
+	You know the process made a significant change to the data. So it can be worth gathering stats immediately, instead of waiting for the background job.		
+	
+The default gather process is too rare
+	By default the optimizer gathers stats on tables where more than ten percent of the rows have changed. 
+	On tables with billions of rows this means 100 million rows need to change before the optimizer will regather stats!
+
+	You can make the database start gathering sooner by lowering the gather threshold. Do this by setting table preferences. You view and set these using DBMS_stats.
+	This sets the change threshold (stale percent) to one percent for the colours table:	
+	
+		select dbms_stats.get_prefs ( 'STALE_PERCENT', null, 'colours' ) from dual; --10
+		exec dbms_stats.set_table_prefs ( null, 'colours', 'STALE_PERCENT', 1 );
+		select dbms_stats.get_prefs ( 'STALE_PERCENT', null, 'colours' ) from dual; --1
+
+Plan Invalidation
+		Gathering stats on a table may change the optimizer's row estimates for queries against it. 
+		If you have lots of queries accessing a table, updating stats may cause the database to have to create a new plan for them all. This adds significant workload to your database!
+
+		So optimizer decides when to invalidate the cursors. This means you may not see plan changes immediately after gathering stats on a table.
+		
+		To force the optimizer to check queries for new plans immediately, set NO_INVALIDATE to FALSE when calling gather stats:
+			exec dbms_stats.gather_table_stats ( null, 'colours', no_invalidate => false ) ;
+			
+		Remember: invalidating cursors when gathering stats this will cause the optimizer to reparse all queries on this table. Use with caution in production environments!
+		
+Gathering Histograms
+
+		Para verificar que no hay histogramas se puede chequear con las columnas HISTOGRAM and NUM_BUCKETS en las tablas *_TAB_COL_STATISTICS
+		
+		To overcome these skew problems, you can gather histograms on the relevant columns. The optimizer will do this automatically based on column usage and data skew. The rules for when this happens are:
+			The column has value skew and statements use the column in range (<, >=, etc.), LIKE, or equality conditions
+			The column has range skew and the column is used in range or LIKE conditions.
+			The column has a small number of distinct values (with some repeated values) and the column is used in range (<, >=, etc.), LIKE, or equality conditions
+			It may also capture histograms when using incremental statistics are used, even if there is no skew. These are ignored by optimizer stats and are out-of-scope for this tutorial.
+			
+Histogram Types
+		
+		There are four types of histograms in Oracle Database:
+			Frequency -> When there are few different values in a column, the database will create a frequency histogram. 
+						 These store the exact number of rows for each value in the column. 
+						 These give the best row estimates for queries.
+						 But there's a limit to how many different values the optimizer can collect exact stats for. 
+						 So when there are a large number of values for a histogram the optimizer will switch to a different type.
+			Height-balanced
+			Hybrid
+			Top-frequency		
+			
+			From Oracle Database 12c, the optimizer will choose a hybrid or top-frequency histogram if there are many values in the column. 
+			Before this it would create height-balanced balanced histograms. These were deprecated in 12c. You'll only see height-balanced histograms in 12c and later if you upgrade from an earlier release.
+			
+Disabling Histograms
+			In most cases histograms help the optimizer find better plans in columns with data skew. 
+			But sometimes they may lead to unstable plans. In which case you may want to disable histograms on the columns in problematic queries.			
+			
+			The SIZE option for the gather method determines what histograms the optimizer will create. By default, it uses: for all columns size auto
+			
+			To disable histograms for a column, set SIZE to one. Do this with the METHOD_OPT parameter of the gather stats routines. 
+			You can specify a specific column or ALL to do this for.
+				exec dbms_stats.gather_table_stats ( null, 'bricks', method_opt => 'for all columns size 1' ) ;
+				
+Creating Extended Statistics
+
+			exec dbms_stats.gather_table_stats ( null, 'bricks', method_opt => 'for columns (colour_rgb_value, shape)', no_invalidate => false ) ;
+
+			The argument (colour_rgb_value, shape) tells the optimizer to gather stats on the combinations of these columns. 
+			You can create extended stats on any set of columns in a table. Or even on expressions such as upper ( shape ).
+			
+			
+TEMA 3 How Much Work is My Query Doing?
+
+	Block: smaller unit of data access
+	Cada vez que consultas una fila esta pidiendo a la bbdd que devuelva el bloque en el que esta y luego devuelva la fila
+	Cada vez que obtienes un block es un consisten get (read consistent view of data, all the values are consistent to the same point in time).
+	Consistent gets  : read consistent view of data, all the values are consistent to the same point in time (past). Conocidos como buffer gets o consistent reads.
+					   Operacion I/O relativamente expensive.
+	Current mode gets: show values are they exists rigth now.
+	
+	Cuando el bloque no esta en memoria la bbdd tiene que recuperarlo de disco (peor caso).
+	
+	Cuantos menos gets haga la query mas rapido irá.
+	
+Measuring Work Done
+	To make SQL statements faster, you need to reduce the amount of work they do. The two key resources are CPU and I/O.
+	I/O is usually the limiting factor in databases. All other things being equal, the less I/O a statement does, the better it will scale.
+	Oracle Database stores rows in blocks. To access a row, it must first read the block the row is stored in. Each time the database reads a new block, this is another logical I/O operation.
+
+	So one of the key metrics to measure in Oracle Database are the logical I/Os for a query. This has two components:
+		Consistent (read) gets
+		Current mode gets	
+		
+Consistent gets
+	These access blocks as they existed at some point in the past. 
+	This is usually the time the query started. This ensures that the query only returns values that existed when the query started. 
+	Any changes made after this are ignored.
+
+	You'll see these gets when running queries or to process the where clause of UPDATEs and DELETEs.		
+	
+	
+Current mode gets
+	This gets the block as it exists right now. You'll see these gets when changing data in INSERT, UPDATE, and DELETE statements.
+	When reading a block - whether in consistent or current mode - if it's not cached in memory, the database will also do a physical read. This fetches the block from disk.
+	
+	You can view the I/O for a statement with the IOSTATS format in DBMS_XPlan.
+	This adds a Buffers column to the plan. 
+	This sums the consistent and current mode gets for the operations:
+	
+	select /*+ gather_plan_statistics */count(*) from bricks;
+
+	select * from   dbms_xplan.display_cursor( 'b5x61q1pa25jj', format => 'IOSTATS LAST' );
+
+How Many Logical I/Os Did an Operation Do?
+	The IOSTATS format reports the logical I/O in the buffers column for each operation in the plan. 
+	These figures are cumulative. So to find the I/Os for an operation, you need to subtract the values for its direct children.
+	
+How Much Memory Did an Operation Use?
+
+	Sorting and joining operations need to read and write data too. 
+	Often these are able to process the rows in memory. 
+	
+	You can see how much memory an operation needed by getting the plan with the MEMSTATS format:
+	
+	select /*+ gather_plan_statistics */* from complex_query;
+
+	select *  from   my_user_xplan.display_cursor( '85b35ny7rud7t', format => 'MEMSTATS LAST' );
+	
+	Unlike the I/O figures, these values are specific to each operation in the plan. 
+	The OMem and 1Mem figures are estimates. 
+	Used-Mem reports how much memory it actually used.	
+	
+How Many Disk Reads and Writes Did an Operation Do?
+
+	When the database is unable to sort rows in memory it writes them to temporary disk. 
+	You can see the amount of disk needed in the Used-Tmp column with the MEMSTATS format.
+	
+	To view the number of disk reads and writes, check the Reads and Writes columns with the IOSTATS format.
+	An easy way to display all this information is with the ALLSTATS format. This is shorthand for MEMSTATS IOSTATS ROWSTATS.
+	
+	The alter session statements in this section limit the amount of memory available for joins and sorts. So these operations will need to write to disk:
+	
+	alter session set workarea_size_policy = manual;
+	alter session set sort_area_size = 25000;
+
+	select /*+ gather_plan_statistics */ row_count from complex_query;
+	
+	select * from   my_user_xplan.display_cursor( '1tatyc2s9n297', format => 'ALLSTATS LAST' );
+	
+	
+Reducing I/O: Only Select Needed Values
+
+	When writing a query, it's good practice to only select the columns you need. 
+	This reduces the amount of data sent over the network from the database to the client. 
+	And it can make operations like sorting and grouping more efficient.
+	
+Reducing I/O: Creating New Data Structures
+
+	A full table scan reads all the rows in a table. If the table stores millions of rows, this leads to lots of wasted work if your query only reads a few rows. 
+	You can create or change data structures to enable the database to read rows more efficiently.
+	The most common way to do this is by creating indexes! These can help the database find a few rows quickly.
+	
+Reducing I/O: Filter vs Access Predicates
+
+	Indexes can also help the database find rows it's looking for faster. With a full table scan, the database reads every row and checks if it meets the WHERE clause.
+	This means the database may read more rows than your query returns, leading to wasted I/O. You can verify this by looking at the "Predicate Information" section of an execution plan
+	Whereas with an index , the database can use this to only read the searched rows.
+	
+	
+Leccion 4 How to Create Indexes	
+
+	Stores de values from the indexed columns and pointers to where those rows are.
+	When deleteing , inserting or updates the database changes the corresponding index entries.
+	Oracle only indexes rows where at least one column has a non-null value, if a row has all his columns with null values , this row doesn't appear in the index.
+
+	Index smaller data structure than the table. Only stores values from indexed columns and row pointers.
+	
+	B-tree index
+	
+		Cada hoja del  arbol tiene punteros al siguiente y anterior bloque en la serie.
+		Each node in a tree is a database block. En cada node guarda grupos de valores que va descomponiendo en hojas del arbol hasta llegar al nodo final que contiene el valor de la columna y el rowid correspondiente a la fila.
+		Con el rowid accede a la fila.
+		Estan balanceados, supone el mismo esfuerzo encontrar cualquiera de los valores.
+		Muy eficiente para busqueda de filas concretas.
+		Puede hacer un range scan cuando el indice no sea unico.
+		El indice es unico creandolo con UNIQUE o creando una primary key.
+		
+		Con un indice unico puede hacer un index full scan , leer el indice entero en lugar de la tabla entera, si por ejemplo seleccionamos la columna indexada sin condiciones en el where.
+		EL indice se puede crear por varias columnas, y si solo consultas por una de las columnas tambien lo utilizará para devolverte las filas.
+		
+		Si el optimizador no usa el indice puede ser por:
+		1.- La base de datos es incapaz de usar el indice
+				Por ejemplo creamos un indice por las columnas color + shape. Si queremos encontrar todas las piezas de cualquier color , la columna shape esta extendida por todas las hojas del indice Btree y tendrá queremos
+				leer todo el indice. Y la base de datos NO lo usara. 
+				PAra evitarlo asegurate que la columna(s) mas de la izquierda del indice todas aparecen en la clausula where, idealmente con condiciones de igualdad.
+				Aplicar funciones en la query a las columnas indexadas puede hacer que no se use el indice, ya que tendria que aplicar la funcion a todas las entradas del indice y seria tan costoso como recorrer la tabla.
+				Para solucionarlo se puede crear function based Index. Hay que usar la funcion tal y como aparece en el indice, exactamente igual, sino tampoco usara el indice.
+				
+				
+				
+		2.- El optimizador considera mejor acceder a toda la tabla que usar el indice
+		
+		
+	The two most common data access methods in Oracle Database are:
+		A full table scan
+		An index access method	
+		
+	The *_INDEXES views return details of the indexes in a database. This query returns the indexes on the BRICKS table:
+		select * from user_indexes where  table_name = 'BRICKS';
+		
+	It's possible to list up to 32 columns in an index. This query returns the indexes on BRICKS and a list of their columns:
+		select index_name, column_name, column_position 
+		from   user_ind_columns
+		where  table_name = 'BRICKS'
+		order  by index_name, column_position;
+		
+	Multi-column Indexes
+	
+		select /*+ gather_plan_statistics */*
+		from   bricks
+		where  colour = 'red'
+		and    weight = 1;
+		
+		This uses the colour index to locate the rows with the colour red. The database reads all these rows in the table. Then filters out the rows with weights other than one.
+		
+		There are two different operations:
+			Access - only read rows that match the search criteria
+			Filter - read all the input rows, discarding those that don't match the search
+
+		It would be more efficient to only read the rows that meet both criteria. To do this, create a multi-column index on COLOUR and WEIGHT. 
+
+
+    Index Only Scans
+		A composite index can also enable the database to only read the index and bypass the table altogether. To do this, all the columns listed in the query must be present in an index.
+		The optimizer can also do an index only scan when you select all the columns in an index without a WHERE clause
+		
+Indexing Nulls
+
+		Change the COLOUR and WEIGHT columns so they allow null values
+		The table may now store rows where these both of columns are NULL. 
+		If you insert such a row, it won't be in the BRICK_COLOUR_WEIGHT_I or BRICK_COLOUR_I indexes. So the query selecting just COLOUR and WEIGHT can no longer use an index
+		This also means queries searching for null-valued colours must use a full table scan (select .............where  colour is null).	
+		
+		To allow IS NULL searches to use an index, there must be at least one non-null expression in the index. 
+		So you can enable the database to use BRICK_COLOUR_WEIGHT_I by making WEIGHT mandatory.
+			alter table bricks modify weight not null;
+			
+			select /*+ gather_plan_statistics null colour */ * from   bricks where  colour is null;
+			
+			The optimizer can use BRICK_COLOUR_WEIGHT_I to find null-valued colours because every row is guaranteed to have a weight. 
+			For example, a row with a null colour and weight of one will have this entry in the index
+			
+Composite Index Column Order
+
+		The order of columns in an index can have a big impact on how effective it is. And whether the optimizer is able to use it!
+		The database searches columns in an index left-to-right. To be most effective, use the leading columns of the index the WHERE clause.
+		
+		For example, COLOUR is the first column in BRICK_COLOUR_WEIGHT_I. Queries looking for colour values in the WHERE clause can restrict their search of the index to only these colours. 
+		This will often appear as an INDEX RANGE SCAN in the plan.
+
+		But queries with WEIGHT in the WHERE clause and COLOUR in the SELECT list can't restrict their search to only those entries matching the weight value. 
+		Instead they check every entry in the index with a (FAST) FULL INDEX SCAN
+		So the query reads all the entries in the index, discarding those where the WEIGHT is not one.
+		A full index scan is usually faster than a full table scan. But slower than an index range scan. To enable a range scan for the previous query, you need to create an index with WEIGHT as the first column.
+		
+Creating Unique Indexes
+
+		you can create a unique index. This is a special type of index that is guaranteed to have at most one entry for each set of values. To do this, add the UNIQUE keyword between CREATE and INDEX
+		The optimizer can also use a unique index to do an INDEX UNIQUE SCAN when a query has equality conditions on all its columns
+		Because there can be at most one entry in the index for each BRICK_ID, this is a highly efficient search method.
+		But the main value of unique indexes is improving data quality by preventing duplicate rows. A common way to do this is by creating a primary key or unique constraint.
+		
+Primary and Unique Key Indexes
+		When you create a primary key or unique constraint, Oracle Database will create a unique index to police it. Unless there's an existing index with the constraint's columns at the start!
+		The database can use existing non-unique indexes with the primary key columns at the start to police the constraint. 
+		To ensure it uses the index you want when adding a primary key, you can specify it in the INDEX clause.
+		
+Function-based indexes
+		If you apply a function to a column in the where clause, the database is unable to range scan regular indexes on that column. 
+		This query uppercases the colours, searching for rows with the value RED. Although there is an index on COLOUR, the optimizer uses a full-table scan
+		This is because the values you're searching for no longer match the values in the index. To overcome this, you can create a function-based index. 
+		Do this by calling the function in the column list of the index
+		To ensure that the optimizer can use a function-based index, call the function in exactly the same way in the index and WHERE clause.
+		
+Avoiding Function-based Indexes
+
+	Function-based indexes are powerful. But it's best to avoid creating them!
+	It's better to create indexes on the base columns. Then change queries so they don't include indexes on the columns in the query.
+	
+	
+TEMA 5 Why Isn't My Query Using an Index?
+
+	The clustering factor
+		Hay dos posibles extremos:
+			Que las filas que busco esten en el mismo block 
+			Que las filas que busco esten distribuidas en todos los bloques del indice, una fila en cada block  (con lo que tengo que leer todos los blocks que es como un full table scan)
+			y luego leer de la tabla.
+			
+		La base de datos estima, para el plan de ejecucion, los bloques a los que va a tener que acceder para obtener los datos.
+		Lo estima a través del clustering factor.
+		
+		Clustering Factor: 
+			Contador que la base de datos calcula cuando se obtienen estadisticas sobre una tabla, para cada indice va a cada entry y por cada entry pregunta si esta en el mismpo bloque que la entry (entrada)
+		previa.
+			Si la respuesta es no incrementa el contador, si es si no hace nada.
+			Es un contador que tiene un limite inferior del numero de bloques en la tabla y un limite superior del numero de filas en la tabla.
+			
+			Cluster mayor -> MAs divididas o separadas estan las filas en relacion al orden en el indice y menos efectivo es el indice. 
+							 Mas probable es que el optimizador no lo use y utilice un full table scan.
+			
+		** Hay que evitar los Hints en el código
+		
+		Las filas insertadas suelen añadirse en los ultimos bloques de las tablas.
+		El clustering factor es pesimistic, pero Oracle a partir de la 12c incluye los table cached blocks que cambia como los calculos del clustering factor funcionan.
+		En lugar de preguntar que si es el bloque actual para la entrada del indice el mismo que la entrada del indice previa, pregunta si el bloque actual aparece en los pasados n table cache blocks index entries.
+		El contador solo se incrementa si no hemos visto el bloque actual recientemente.
+		
+		table_cached_blocks es una preferencia del paquete dbms_stats.get_prefs
+		Podemos cambiarlo por ejemplo de 1 a 16 y lanzar las estadisticas para provocar el cambio.
+		
+		Lo importante es saber a cuantos bloques va a tener que acceder el indice en relacion al total de bloques en la tabla.
+		Si el indice tiene que releer muchos bloques entonces el full table scan es mejor.
+		
+		Como regla general poner table_cached_blocks a 10 mejora la estimacion de la mayoria de datos clusterizados.
+		
+Physical Row Location
+	Oracle Database stores rows in blocks. You can find the block number for a row using DBMS_rowid:		
+		select brick_id, dbms_rowid.rowid_block_number ( rowid ) blk# 
+		from   bricks
+		where  mod ( brick_id, 100 ) = 0;
+			
+		By default, tables are heap organized in Oracle Database. This means that the database is free to place rows wherever it wants.
+		But indexes are ordered data structures. New entries must go in the correct location. 
+		
+		The closer the physical order of rows matches the logical order of an index, the more effective that index will be.
+		
+		The smallest unit of I/O in Oracle Database is a block. So the more consecutive index entries there are that point to the same block, the more rows you can fetch in one I/O. 
+		Thus the more effective the index will be.
+		
+		When determining how effective an index is, it's the number of I/O operations that matter. Not how many rows it accesses!
+		So how does the optimizer know how closely the logical and physical orders match? It estimates using the clustering factor.
+		
+		The clustering factor is a measure of how closely the logical index order matches the physical table order for rows. The database calculates this when gathering stats. It does this by asking:
+				Is the row for the current index entry in the same block as the previous entry or a different one?
+
+		Each time consecutive index entries are in different blocks, the optimizer increments a counter. 
+		When stats gathering is complete this gives a value ranging from the number of blocks in the table to the number of rows. 
+		The lower this value, the better clustered the rows are and the more likely the database is to use the index.
+		
+			select index_name, clustering_factor, ut.num_rows, ut.blocks
+			from   user_indexes ui
+			join   user_tables ut
+			on     ui.table_name = ut.table_name
+			where  ui.table_name = 'BRICKS';
+		
+		The index on BRICK_ID (BRICK_PK) has perfect clustering (clustering factor <= blocks). Whereas the clustering for the weight index is almost as bad as it can be (clustering factor ~ number of rows).
+		
+Fetching Partly Clustered Rows		
+
+	The INSERT_DATE index has an "average" clustering factor. 
+	This means the database is unlikely to use it, even when fetching relatively few rows. 
+	For example, this query fetches less than 5% of the rows, but still opts for a full table scan
+	
+	But zooming out months, it seems the values are almost as well clustered as BRICK_ID:
+
+			with rws as ( 
+		  select trunc ( insert_date, 'mm' ) dt, 
+				 ceil ( 
+				   dense_rank () over (
+					 order by dbms_rowid.rowid_block_number ( rowid )
+				   ) / 10 
+				 ) rid
+		  from   bricks
+		)
+		  select * from rws
+		  pivot (
+			count (*) for rid in (
+			  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+			)
+		  )
+		  order by dt;
+
+	So why is the clustering factor for its index so high?
+	This is because there are several rows and the start and end of each day that hop back-and-forth between two blocks:
+	
+		with rws as (
+		select brick_id,
+			 to_char ( insert_date, 'DD MON HH24:MI' ) dt, 
+			 dbms_rowid.rowid_block_number ( rowid ) current_block,
+			 lag ( dbms_rowid.rowid_block_number ( rowid ) ) over (
+			   order by insert_date
+			 ) prev_block
+		from   bricks
+		where  insert_date >= date '2020-01-01'
+		and    insert_date <  date '2020-02-01'
+			)
+		select * from rws
+		where  current_block <> prev_block
+		order  by dt;
+
+	This gives the optimizer the impression that the rows are much poorly clustered than they really are. This is a common problem for always increasing values such as insert dates which are "mostly" clustered. Luckily there's a trick to help in these scenarios:
+	Set the TABLE_CACHED_BLOCKS preference!
+	
+Improving Stats for Mostly Clustered Rows
+
+	The TABLE_CACHED_BLOCKS preference tells the optimizer to keep track of how recently it saw a value. By default this is one
+	
+		select dbms_stats.get_prefs ( 'table_cached_blocks', null, 'bricks' ) from   dual;
+	
+	This means when consecutive index entries point to different blocks, the clustering factor increases. 
+	Upping the preference slightly, e.g. to 16 enables the database to spot these mostly clustered values. 
+	You do this by setting the table preference:
+		
+			begin 
+				dbms_stats.set_table_prefs ( 
+				null, 'bricks', 'table_cached_blocks', 16 
+				);
+			end;
+			/
+			
+	You need to regather stats for this change to take effect
+	
+		select index_name, clustering_factor 
+		from   user_indexes
+		where  table_name = 'BRICKS';
+
+		exec dbms_stats.gather_table_stats ( null, 'bricks' ) ;
+
+		select index_name, clustering_factor 
+		from   user_indexes
+		where  table_name = 'BRICKS';
+
+				
+	This makes the optimizer much more likely to use the index when searching by date. 
+	In fact, the optimizer will now use this index when fetching more than 5% of the rows in the table
+	
+Improving Clustering for a Column
+
+		Setting TABLE_CACHED_BLOCKS helps the optimizer spot mostly clustered values.
+		But setting this to a huge value merely tricks the optimizer. 
+		This can fool it to thinking that values such as WEIGHT that are spread throughout the whole table are clustered in a few blocks. 
+		The database still needs to do the same number of I/Os to fetch the rows.
+
+		To make indexes on WEIGHT more effective, you need to physically re-order rows in the table. 
+		This re-ordering must move rows with the same value for WEIGHT to the same blocks.
+
+		It's possible to do this by copying all the rows to a temporary table. Then deleting all the rows from BRICKS and re-inserting them sorted by WEIGHT:
+		
+		insert into bricks_temp
+		select * from bricks;
+		
+		delete bricks;
+
+		insert into bricks
+		select * from bricks_temp
+		order  by weight;
+
+		commit;
+
+		exec dbms_stats.gather_table_stats ( null, 'bricks' );
+
+		select index_name, clustering_factor
+		from   user_indexes
+		where  table_name = 'BRICKS';
+			
+	
+		This leads to a big improvement for the clustering of the weight index. But comes at the cost of the other columns. The indexes on BRICK_ID and INSERT_DATE are now nearly imperfectly clustered!
+		Re-sorting all the rows in a table like this is impractical in most applications. Luckily Oracle Database has several data structures you can use to force physical order on data.	
+		
+Changing the Physical Data Model
+
+		Deleting then re-inserting all the rows in a table is an unworkable solution for most tables. It's better to place rows where you want them on insert.
+		Oracle Database has several data structures that do this to a greater or lesser extent. These include:
+				Index-organized tables
+				Partitioning
+				Table clusters
+
+		These all have various pros and cons. And require a rebuild to add to existing tables. Making it impractical to change most existing tables. 
+		There is another, more lightweight technique available from 12.2: Attribute Clustering
+		
+Attribute Clustering
+
+		Attribute clustering defines a physical order for rows. 
+		Using a linear order sorts the values in the same way as ORDER BY; it works through the columns left-to-right, only using the next column to resolve ties.
+		
+		This adds linear clustering by INSERT_DATE. So the database will sort the rows by this column:
+
+			alter table bricks add clustering by linear order ( insert_date );
+			
+		But this has no effect on existing data. Only rows added using direct-path inserts use this ordering. To apply it to current rows, move the table:
+
+				select index_name, clustering_factor
+				from   user_indexes
+				where  table_name = 'BRICKS';
+
+				alter table bricks
+				  move online;
+
+				exec dbms_stats.gather_table_stats ( null, 'bricks' ) ;
+
+				select index_name, clustering_factor
+				from   user_indexes
+				where  table_name = 'BRICKS';
+
+		
+		Linear sorting gives perfect clustering for the leading column of the cluster. Along with any other columns highly correlated with these values.
+		But it's rare all queries on a table use the same column in the where clause. So sorting on one column improves the performance of these queries, at the cost of queries on other columns.
+		Usually there are several key queries, each filtering on different columns. You want to ensure all these columns can use an index if possible. 
+		To help with this it's possible to interleave the values from two or more columns.
+		
+Interleaved Attribute Clustering
+
+	Interleaved clustering sorts similar values together. This can improve the clustering for two or more loosely correlated columns at the same time. This interleaves the values for BRICK_ID and SHAPE:
+	
+	alter table bricks
+	add clustering
+	by interleaved order ( brick_id, shape );
+	
+	This gives near-perfect clustering for these two columns. The effect of this is to trace a Z-shape in a matrix of these values.
+
+	But it's not the total clustering factor for your indexes that matters. You need to assess the performance needs of your queries. 
+	It may be that queries by weight or colour are part of the application search page. These are constantly executed and must be as fast as possible.
+
+	Whereas searches by date only happen once per day as part of a background job. So this query can take a little longer. 
+	Once you've found these requirements you can choose the appropriate columns to cluster on. In this example WEIGHT and COLOUR.
+		
+TEMA 6: How to Summarize Data Fast with Materialized Views
+
+	Vista normal       : Almacena el texto de la consulta.
+	Vista materializada: Almacena el resultado de la sentencia SQL, al acceder a ella accedes al resultado precalculado.
+	
+	Vista materializada
+		Util cuando las tablas tienen millones o billones de registros pero la consulta solo va a devolver un numero limitado de registros.
+		
+	Quey Rewrite: Si tienes codigo SQL que coincide con la consulta de la vista materializada, la base de datos leerá la VM en lugar de las tablas base de la consulta.
+				  Tambien aplica a querys similares a la de la VM. 
+						alter materialized view xxx enable query rewrite;
+	
+	Si añadimos/eliminamos/actualizamos datos a las tablas base habrá diferencias entre las tablas y la VM y la base de datos no ejecutará query rewrite.
+	Hay que refrescar la VM: dbms_view.refresh('xxxx');
+	
+	Fast Refresh:
+	El refresco lleva tiempo, pero cada vez que hacemos un cambio en la tabla base podemos guardarlo en un log y entonces al hacer un refresco solo aplicará los cambios almacenados en el log, es mucho mas rápido.
+	Para esto hay que crear un materialized view log.
+		create materialized view log on tabla; -> Se crea sobre la tabla sobre la que se quiere tener log de los cambios.
+		
+		create materialized view log on tableA
+			with primary key,
+				 rowid,
+				 sequence,
+				 commit scn
+				 (columnas de la tabla que se usan en la VM)
+			including new values;
+	
+	No siempre se puede aplicar el fast refresh. 
+	Por ejemplo si quiero sacar de una tabla el total de combinaciones de campo1 y campo2 una query se puede hacer fast refresh, 
+	pero si quiero sacar el count(*) de la columna 1 y para ese valor los valores distintos de la column 2 no puedo aplicar fast refresh porque si añado un elemento no se si esta incluido en el conteo de valores 
+	distintos con lo que tengo que ejecutar la consulta entera de nuevo.
+	
+	dbms_mview.explain_mview te indica porque una VM es fast refreshable o no y que debes hacer para lograrlo.
+	
+	Si se puede hacer fast refresh se hace:
+		alter materialized view xxx refresh fast on commit;
+		on commit -> La base de datos la actualiza automaticamente, nunca queda obsoleta -> Esto añade procesamiento al trabajar con las tablas que componen la VM y en algunos casos esto puede ser excesivo,
+					 por lo que a veces es necesario en lugar del on commit refrescar la VM en un horario programado.
+					 Si se refresca en horario programado a veces la consulta irá rápida y otras no (no hace query rewrite).
+					 
+					 Estos cambios en el rendimiento son muy perjudiciales, para solucionarlo se puede hacer:
+					 alter session set query_rewrite_integrity = stale_tolerated; -> Tolerancia a datos obsoletos. Puede hacer query rewrite aunque los datos estén obsoletos.
+					 
+	En 12c estan las Real Time Materialized Views -> Toman un VM obsoleta y al momento de ejecutar la consulta aplican los cambios registrados en el log.
+													 No necesitaas actualizar la VM en cada transaccion, pero hay que tener en cuenta que hay que continuar haciendo refrescos programados para mantener
+													 el tamaño del view log pequeño de modo que al aplicar los cambios tarde poco.
+													 
+													 
+TEMA 7: How do Joins Work?
+
+		NESTED LOOP: Por cada valor en la tablaA se recorre la tablaB buscando el correspondiente. Cuando lo encuentra no deja de buscar, continua por si hay mas de uno que corresponde.
+					 Consume mucho tiempo. 
+		
+		MERGE JOIN: Se pueden ordenar las tablas por las columnas del join antes de cruzarlas, por cada valor de la tablaA se compara con la tablaB y como estan ordenadas, 
+					tras un join donde coincidan solo se mira el siguiente valor y cuando no coincida se deja de buscar.
+					
+		MERGE JOIN es mas rápido de un NESTED LOOP pero necesitas ordenar primero y ordenar es lento
+		
+		HASH JOIN: Miro cada valor del a tablaA y le aplico una funcion HASH que guarda en una hash table. 
+				   Cuando termino con la tablaA tomo la tablaB y le aplico la misma función HASH a los valores y busco un valor coincidente en la tabla hash (busca la correspondecia de valores en las dos tablas).
+				   
+				   Hash Join es el metodo con mejor rendimiento ya que garantiza que se lee cada fila una sola vez.
+				   
+				   
+		Para usar HASH JOIN el join debe incluir igualdades (=).
+		
+		Si solo queremos comparar un subconjunto de los valores de la tablaA:
+			HASH JOIN, tenemos que leer todos los registros de la tablaA antes de poder empezar a leer los registros de la tablaB. Es lento. Y ademas aunque se cree un indice no puede usarlo en la tablaB.
+			
+			NESTED LOOP tan pronto como tenemos un valor de la tablaA podemos compararlo con la TablaB, pero por cada valor de la tablaA tenemos que recorrer toda la tablaB. Es lento a menos que creemos un indice.
+						con un indice solo hacemos una busqueda en la tablaB por cada valor de la tablaA
+			
+			MERGE JOIN: Si tenemos un indice evitamos tener que ordenar los datos de la tablaA previamente, pero por desgracia Oracle continua ordenando la tablaB antes de realizar el join.
+			
+			Por lo que si solo queremos comparar un subconjunto de datos NESTED LOOP puede ser lo mas eficiente.
+			
+		Si las estadisticas no estan actualziadas el optimizador puede intercambiar entre NESTED LOOPS y HASH JOIN con facilidad, la linea es muy fina. A partir de 12c estan los Adaptive Plans como solucion:
+		Un plan que considera dos tipos de joins. Tiene un recolector de estadisticas observando las filas que se obtienen de la primera tabla y siempre que se mantenga por debajo de un umbral determinado
+		usará un tipo de join pero si se supera ese uumbral cambiará a otro tipo de JOIN.
+		Permite al optimizador seleccionar el mejor plan en función de lo que realmente esta almacenado en la tabla.
+		
+		Para saber porque se esta seleccionanmdo un tipo de join u otro es util mirar las estadisticas y los indices.
+		
+TEMA 8: How to Make Inserts, Updates, and Deletes Faster
+
+			Para updates y deletes se puede cambiar estas sentencias por select para ver el rendimiento.
+			Para insert-select se quita el insert y se ejecuta la query
+			Para insert usando valores no se puede hacer, no hay consulta.
+			
+			Error de rendimiento: escribir datos dentro de loops.
+				Es mejor escribir una sola sentencia que recorrer un bucle.
+				Pero en updates y deletes si afectan a mucho registro puede ir lento.
+				Truco: convertir DML en DDL. -> Guardar los datos que quieres conservar en una nueva tabla. create table A as (select  ...........)
+												Truncar la tabla original
+												Insertar en la tabla original los datos de la tabla del paso 1 (insert into tablaOriginal select * from tabla A)
+												
+												Tambien se puede hacer renombrando:
+												create table A as (select  ...........)
+												rename tablaOriginal to TablaOriginalBackup
+												rename TablaA to tablaOriginal
+												Hay que copiar los indices, constatins ,etc lo que lleva tiempo.
+												
+												Hay que desconectar la aplicacion,esta tecnica no es posible muchas veces.
+												
+			Opciones mejores:
+			
+			Particionamiento: dividir la tabla en tablas logicas basandose en valores de una o mas columnas.
+							  Se pueden borrar y truncar particiones.
+							  Particionar afecta a todas las operaciones contra la tabla.Algunas se pueden volver mas lentas. Hay otra opcion, movimiento de tabla filtrado.
+							  
+			Movimiento de tabla filtrado: 
+							  alter table X move including rows where xxx = 'xxx'
+							  Añadir where a comando move.
+							  Descarta todas las filas que se quieren eliminar.
+							  Se puede hacer online.
+			
+			* RECORDAR: DDL hace commit, no se pueden deshacer los cambios.
+			
+			Problemas para las escrituras:
+				-Locking sessions: En Oracle nada bloquea una select pero otras sesiones pueden bloquear una escritura cuando se inserta o actualiza el mismo registro (problemas de PK)
+				-Triggers: si el trigger ralentiza la operación  habra que reescribir el proceso para que no use los triggers.
+				
+TEMA 9 How to Find Slow SQL				
+
+		
+		Focalizar el esfuerzo de tuning en el proceso(s) que tarde mas al ejecutar cada parte del codigo.
+		
+		SQLTrace: Detalles de la ejecucion para todo el SQL ejecutado en la sesiones y puedes analizar la ejecucion del codigo PL/SQL con el hierarchical profiler.
+		
+		alter session set tracefile_identifier = plsql_nombre_proc;
+		exec sys.dbms_monitor.session_trace_enable (waits => true, binds => true);
+		
+		exec plsql_nombre_proc;
+		
+		exec sys.dbms_monitor.session_trace_disable;
+		
+		Con la vista v$diag_info nos muestra la ruta donde esta el fichero y se puede saacar el nombre y que te lo pasen los dbas.
+		En 12.2 existe la vista v$diag_trace_file_contents 
+		
+		Pero en el fichero solo vemos la ejecucion de SQL , no PL/SQL.
+		
+		Hierarchical Profiler (en SQLDeveloper)
+		
+		Minimizar las llamadas a la base de datos. Ejecutar en una llamada lo máximo posible.
+			- Evitar SQL en bucles.
+			- Stored Procedures para enviar multiple SQL a la base de datos en una llamada. Codigo compilado en la base de datos.
+			
+			
+			
+												
+												
+		TRACEAR:
+
+			alter session set tracefile_identifier = plsql_nombre_proc;
+			exec sys.dbms_monitor.session_trace_enable (waits => true, binds => true);
+		
+			exec plsql_nombre_proc;
+		
+			exec sys.dbms_monitor.session_trace_disable;
+												
+		ACCEDER AL FICHERO DE TRAZA:
+
+			set serveroutput off
+			set pagesize 0
+			set echo off 
+			set feedback off 
+			set trimspool on 
+			set heading off
+			set tab off
+
+			spool c:\temp\trace-file.trc
+			select payload 
+			from   v$diag_trace_file_contents
+			where  trace_filename = (
+				select substr (
+					   value,
+					   instr ( value, '/', -1 ) + 1
+					 ) filename
+			  from   v$diag_info
+			  where  name = 'Default Trace File'
+			)
+			order  by line_number;
+			spool off		
+				
+			
+		Formatting SQL Trace Files
+		
+			tkprof trace_file_name.trc output_filename.txt
+			
+Profiling PL/SQL Code
+
+		SQL is just part of each process. There will also be some non-SQL code to call the statement, process its results, etc. In some cases the application code may take longer than the SQL!
+
+		So when performance tuning, it's important you profile all the code. Exactly how you do this depends on the programming language you're using. For PL/SQL code, you can use the hierarchical profiler.
+
+		This uses DBMS_HProf to capture execution details. Do this by calling:
+
+		dbms_hprof.start_profiling to start the profile
+		the PL/SQL procedure you want to profile
+		dbms_hprof.stop_profiling to end the run
+		This snippet outlines how to do this:
+			
+		
+			truncate table school_attendance;
+
+			exec dbms_hprof.create_tables ( true );
+
+			declare
+			  run pls_integer;
+			begin
+			  run := dbms_hprof.start_profiling ();
+			  start_school ();
+			  dbms_hprof.stop_profiling;
+			  dbms_output.put_line ( run );
+			end;
+			/
+						
+Saving PL/SQL Profile Details
+
+		To analyze the profile and persist it to database tables, run:
+
+		declare
+		analysis_id pls_integer;
+		begin
+		analysis_id := dbms_hprof.analyze ( 1, run_comment => 'Test run' );
+		end;
+		/
+		
+Viewing PL/SQL Profiles
+		Querying this view returns the execution details:		
+				select * from execution_stats;
+				
+				select unit, function_elapsed_time, calls, sql_text 
+				from   execution_stats
+				order  by function_elapsed_time desc;
+				
+				
+				
+		
+		
+		
+				   
+				   
+					
+					 
+					 
+					 
+		
+		
+		
+		
+	
+	
+	
+	
+	
+	
+	
+			
+				 
+				 
+	
+				 
+		
+	
+	
+	
+	
+	
+				  
+				  
+	
+	
+	
+	
+		
+
+
+
+
+
+
+	
+	
+	
+	
+	
+		
+		
+
