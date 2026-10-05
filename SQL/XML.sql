@@ -97,6 +97,41 @@ INSERT INTO alumnosXMLType
 # In line 11 of orastream:
 # LPX-00225: end-element tag "ALUMNO" does not match start-element tag "NOMBRE"
 
+##################################
+# GENERAR XML A PARTIR DE CONSULTA
+##################################
+
+SELECT XMLELEMENT("Empleados",
+         XMLAGG(
+           XMLELEMENT("Empleado",
+             XMLFOREST(employee_id AS "Id", first_name AS "Nombre", department_id AS "Departamento", salary AS "Salario")
+           )
+         )
+       ) AS xml_output
+FROM employees;
+
+SELECT XMLELEMENT("Empresa",
+         XMLAGG(
+           XMLELEMENT("Departamento",
+             XMLATTRIBUTES(d.department_id AS "id"), -- Atributo en el segundo nivel
+             XMLELEMENT("NombreDepartamento", d.department_name),
+             
+             -- Tercer nivel de profundidad (Lista de Empleados)
+             XMLELEMENT("Empleados",
+               (SELECT XMLAGG(
+                         XMLELEMENT("Empleado",
+                           XMLFOREST(e.employee_id AS "Id", e.first_name AS "Nombre", e.salary AS "Salario")
+                         )
+                       )
+                FROM employees e
+                WHERE e.department_id = d.department_id)
+             )
+             
+           )
+         )
+       ) AS xml_resultado
+FROM departments d;
+
 ####################
 # SELECCION DE DATOS
 ####################
@@ -128,6 +163,43 @@ WHERE a.alumno.extract('/ALUMNO/NOMBRE/text()').getStringVal() = 'Aitor'
 SELECT a.alumno.extract('/ALUMNO/DIRECCION/POBLACION/text()').getStringVal()
 FROM alumnosXMLType a
 WHERE a.alumno.existsNode('/ALUMNO[NOMBRE="Aitor" and DIRECCION/PROVINCIA="Barcelona"]')=1;
+
+# XMLTABLE transforma los datos de un documento XML en columnas y filas relacionales estándar. 
+# Es la mejor opción cuando necesitas extraer múltiples elementos del XML en una sola consulta o cuando el XML contiene listas repetitivas.
+
+SELECT p.id, xt.NOMBRE_ALUMNO, xt.PROVINCIA_ALUMNO
+FROM alumnosXMLType p,
+XMLTABLE('/ALUMNO'
+    PASSING p.ALUMNO
+    COLUMNS 
+        nombre_alumno VARCHAR2(50) PATH 'NOMBRE',
+        provincia_alumno VARCHAR2(50) PATH 'DIRECCION/PROVINCIA'
+) xt;
+
+SELECT p.id, xt.NOMBRE_ALUMNO, xt.PROVINCIA_ALUMNO
+FROM alumnosClob p,
+XMLTABLE('/ALUMNO'
+    PASSING XMLTYPE(p.ALUMNO)
+    COLUMNS 
+        nombre_alumno VARCHAR2(50) PATH 'NOMBRE',
+        provincia_alumno VARCHAR2(50) PATH 'DIRECCION/PROVINCIA'
+) xt
+where p.id = 1;
+
+# XMLQUERY ejecuta una expresión XQuery sobre los datos XML y devuelve un objeto XMLType. 
+# Si deseas obtener un texto plano o un número (como hacía EXTRACTVALUE), debes envolverlo con XMLCAST.
+# Extraer un único valor puntual.
+
+SELECT 
+    XMLCAST(XMLQUERY('/ALUMNO/NOMBRE/text()' PASSING ALUMNO RETURNING CONTENT) AS VARCHAR2(50)) AS nombre,
+    XMLCAST(XMLQUERY('/ALUMNO/DIRECCION/PROVINCIA/text()' PASSING ALUMNO RETURNING CONTENT)  AS VARCHAR2(50)) AS provincia
+FROM alumnosXMLType
+
+SELECT 
+    XMLCAST(XMLQUERY('/ALUMNO/NOMBRE/text()' PASSING XMLTYPE(ALUMNO) RETURNING CONTENT) AS VARCHAR2(50)) AS nombre_alumno,
+    XMLCAST(XMLQUERY('/ALUMNO/DIRECCION/PROVINCIA/text()' PASSING XMLTYPE(ALUMNO) RETURNING CONTENT) AS VARCHAR2(50)) AS provincia_alumno
+FROM alumnosClob
+where id = 1;
 
 ########################
 # ACTUALIZACION DE DATOS
