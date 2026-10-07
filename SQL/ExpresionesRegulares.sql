@@ -18,7 +18,6 @@
 # ?					0 o 1 repetición (opcional)						colou?r (colour o color)
 # |					Operador lógico OR								cat|dog
 
-
 #El parámetro [modificadores] (Match Parameters)
 #     Este parámetro es común a las cuatro funciones. 
 #     Se escribe entre comillas simples y acepta las siguientes letras (puedes combinarlas, por ejemplo 'iy'):
@@ -29,8 +28,6 @@
 # 			n			Permite que el operador punto . coincida con caracteres de salto de línea.
 # 			m			Trata el texto como múltiples líneas (hace que ^ y $ funcionen al inicio/fin de cada línea y no solo de todo el texto).
 # 			x			Ignora los espacios en blanco dentro de tu expresión regular (útil para documentarla sin que afecte la búsqueda).
-
-
 
 #############
 # REGEXP_LIKE
@@ -66,7 +63,6 @@ CREATE TABLE t1 (
 # [ocurrencia]: Qué coincidencia extraer si hay varias (por defecto 1).
 # [modificadores]: Opciones de búsqueda
 # [subexpresion]: Si usas paréntesis ( ) para agrupar, indica qué grupo específico quieres extraer. Si pones 1, solo te extraerá lo que esté dentro del primer par de paréntesis.
-
 
 # Extraer solo la parte numérica de una cadena de código (por ejemplo, extraer 12345 de REF-12345-ABC)
 SELECT REGEXP_SUBSTR('REF-12345-ABC', '[0-9]+') AS numero_extraido FROM DUAL;
@@ -105,8 +101,6 @@ SELECT REGEXP_REPLACE('Oracle    SQL   es    potente', '\s+', '-') AS texto_limp
 # [modificadores]: Opciones de búsqueda.
 # [subexpresion]: Si usas grupos con paréntesis ( ) en tu patrón, indica cuál de los grupos quieres rastrear (0 significa todo el patrón).
 
-
-
 # Si tienes una cadena de texto mezclada y quieres saber exactamente en qué posición empieza el primer bloque de números:
 SELECT REGEXP_INSTR('Código de producto: 481516-X', '[0-9]+') AS posicion_numero FROM DUAL
 
@@ -115,9 +109,3 @@ SELECT REGEXP_INSTR('192.168.1.15', '\.', 1, 2) AS posicion_segundo_punto FROM D
 
 # buscar la posición justo después de un código postal de 5 dígitos:
 SELECT REGEXP_INSTR('Madrid, CP 28001, España', '[0-9]{5}', 1, 1, 1) AS posicion_final FROM DUAL;
-
-
-
-
-
-
