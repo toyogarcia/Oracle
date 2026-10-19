@@ -1,0 +1,239 @@
+{
+  "info": {
+    "_postman_id": "f7dae3ac-3bf2-46ce-94c7-8f5e681a5c0f",
+    "name": "API Oracle TEST",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "53239748",
+    "_collection_link": "https://go.postman.co/collection/53239748-f7dae3ac-3bf2-46ce-94c7-8f5e681a5c0f?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "GET",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": ""
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "POST",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Devuelve 201\", () => pm.response.to.have.status(201));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "oauth2",
+          "oauth2": [
+            {
+              "key": "clientId",
+              "value": "xxxxxxxxxxx",
+              "type": "string"
+            },
+            {
+              "key": "accessTokenUrl",
+              "value": "https://xxxxxxxxxxx.oraclecloudapps.com/ords/api/oauth/token",
+              "type": "string"
+            },
+            {
+              "key": "addTokenTo",
+              "value": "header",
+              "type": "string"
+            },
+            {
+              "key": "clientSecret",
+              "value": "xxxxxxxxxxx",
+              "type": "string"
+            },
+            {
+              "key": "grant_type",
+              "value": "client_credentials",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Desde Postman\", \"due_date\": \"2026-11-01\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://xxxxxxxxxxx.oraclecloudapps.com/ords/api/v1/tasks/",
+          "protocol": "https",
+          "host": [
+            "xxxxxxxxxxx",
+            "xxxxxxxxxxx",
+            "xxxxxxxxxxx",
+            "oraclecloudapps",
+            "com"
+          ],
+          "path": [
+            "ords",
+            "api",
+            "v1",
+            "tasks",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "PUT",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Devuelve 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "oauth2",
+          "oauth2": [
+            {
+              "key": "clientId",
+              "value": "xxxxxxxxxxx",
+              "type": "string"
+            },
+            {
+              "key": "accessTokenUrl",
+              "value": "https://xxxxxxxxxxx.oraclecloudapps.com/ords/api/oauth/token",
+              "type": "string"
+            },
+            {
+              "key": "addTokenTo",
+              "value": "header",
+              "type": "string"
+            },
+            {
+              "key": "clientSecret",
+              "value": "xxxxxxxxxxx",
+              "type": "string"
+            },
+            {
+              "key": "grant_type",
+              "value": "client_credentials",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"status\": \"DOING\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://xxxxxxxxxxx.oraclecloudapps.com/ords/api/v1/tasks/1",
+          "protocol": "https",
+          "host": [
+            "xxxxxxxxxxx",
+            "xxxxxxxxxxx",
+            "xxxxxxxxxxx",
+            "oraclecloudapps",
+            "com"
+          ],
+          "path": [
+            "ords",
+            "api",
+            "v1",
+            "tasks",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "DELETE",
+      "request": {
+        "auth": {
+          "type": "oauth2",
+          "oauth2": [
+            {
+              "key": "clientId",
+              "value": "xxxxxxxxxxx",
+              "type": "string"
+            },
+            {
+              "key": "accessTokenUrl",
+              "value": "https://xxxxxxxxxxx.oraclecloudapps.com/ords/api/oauth/token",
+              "type": "string"
+            },
+            {
+              "key": "addTokenTo",
+              "value": "header",
+              "type": "string"
+            },
+            {
+              "key": "clientSecret",
+              "value": "xxxxxxxxxxx",
+              "type": "string"
+            },
+            {
+              "key": "grant_type",
+              "value": "client_credentials",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://xxxxxxxxxxx.oraclecloudapps.com/ords/api/v1/tasks/24",
+          "protocol": "https",
+          "host": [
+            "xxxxxxxxxxx",
+            "xxxxxxxxxxx",
+            "xxxxxxxxxxx",
+            "oraclecloudapps",
+            "com"
+          ],
+          "path": [
+            "ords",
+            "api",
+            "v1",
+            "tasks",
+            "24"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
