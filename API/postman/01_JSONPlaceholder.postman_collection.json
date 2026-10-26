@@ -1,0 +1,179 @@
+{
+  "info": {
+    "name": "01 - JSONPlaceholder (API pública)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Mismas llamadas que hace Oracle con UTL_HTTP (scripts 07-10). Compara los resultados."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://jsonplaceholder.typicode.com"
+    }
+  ],
+  "item": [
+    {
+      "name": "GET - Todos los posts",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/posts"
+        },
+        "description": "Equivale a api_cliente.get_posts (script 07)"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Devuelve 100 posts', () => pm.expect(pm.response.json().length).to.eql(100));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET - Un post (id 1)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/posts/1"
+        },
+        "description": "Equivale a api_cliente.get_post(1)"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('id = 1', () => pm.expect(pm.response.json().id).to.eql(1));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET - Post inexistente (404)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/posts/99999"
+        },
+        "description": "Equivale al PASO 7.3"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST - Crear post",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/posts"
+        },
+        "description": "Equivale a api_cliente.crear_post (script 08)",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1,\n  \"title\": \"Mi primer post desde Oracle\",\n  \"body\": \"Enviado con UTL_HTTP desde Oracle Autonomous Database\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('id = 101', () => pm.expect(pm.response.json().id).to.eql(101));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT - Actualizar post 1",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/posts/1"
+        },
+        "description": "Equivale a api_cliente.actualizar_post (script 09)",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 1,\n  \"userId\": 1,\n  \"title\": \"Título ACTUALIZADO desde Oracle\",\n  \"body\": \"Contenido modificado con un PUT\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Título actualizado', () => pm.expect(pm.response.json().title).to.include('ACTUALIZADO'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "DELETE - Borrar post 1",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/posts/1"
+        },
+        "description": "Equivale a api_cliente.eliminar_post (script 10)"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
