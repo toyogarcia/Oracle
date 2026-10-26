@@ -3,13 +3,15 @@
 Proyecto que muestra las dos caras de las APIs REST en Oracle:
 
 ```
-**Servicios REST** 
+Servicios REST
+
 Es el concepto arquitectónico. Es la "autopista" y las reglas de tráfico para que dos sistemas se comuniquen en la web usando HTTP.
 Es un estándar de la industria. Utiliza los verbos HTTP estándar (GET, POST, PUT, DELETE) para intercambiar información (generalmente en formato JSON o XML).
 ```
 
 ```
-**UTL_HTTP**
+UTL_HTTP
+
 Es una herramienta interna de la base de datos Oracle para consumir (llamar) servicios REST externos.
 Actua como un cliente web o navegador dentro de PL/SQL.
 Requiere configurar la seguridad de la base de datos (ACLs - Access Control Lists) y si el sitio es HTTPS, debes configurar un Oracle Wallet con los certificados de seguridad.
@@ -21,7 +23,7 @@ DELETE: Solicitar la eliminación de un recurso en un servidor externo.
 ```
 
 ```
-**ORDS (Oracle REST Data Services)**
+ORDS (Oracle REST Data Services)
 Es una herramienta de Oracle para crear (publicar) servicios REST a partir de tus datos y procedimientos almacenados.
 Actua como una puerta de enlace (API Gateway) para la base de datos.
 Es un puente Java que se coloca frente a tu base de datos Oracle.
@@ -54,7 +56,7 @@ Probado en **Oracle Autonomous Database – Always Free (OCI)**.
 PARTE 1 (Oracle = cliente)                    PARTE 2 (Oracle = servidor)
 
  ┌──────────────┐  UTL_HTTP   ┌─────────────┐        ┌─────────┐   HTTPS   ┌──────────────┐
- │  PL/SQL      │────────────▶│ JSONPlace-  │        │ Postman │──────────▶│    ORDS      │
+ │  PL/SQL      │─────────── ▶│ JSONPlace-  │        │ Postman │──────────▶│    ORDS      │
  │ API_CLIENTE  │◀────────────│ holder.com  │        └─────────┘◀──────────│ /ords/apidemo│
  └──────────────┘  HTTPS+ACL  └─────────────┘                              └──────┬───────┘
                                                                                     │ SQL
