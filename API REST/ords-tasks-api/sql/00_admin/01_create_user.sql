@@ -2,7 +2,7 @@
 -- El resto de scripts se deben ejecutar con el usuario tasks_dev
 
 -- Creacion del usuario de base de datos
-CREATE USER tasks_dev IDENTIFIED BY "API_Rest2026"
+CREATE USER tasks_dev IDENTIFIED BY "<TU_CLAVE>"
   QUOTA UNLIMITED ON data;
 
 -- Concesion de los permisos necesarios al usuario de base de datos creado
