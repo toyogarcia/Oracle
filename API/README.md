@@ -3,34 +3,34 @@
 Proyecto que muestra las dos caras de las APIs REST en Oracle:
 
 ```
-Servicios REST: 
-	Es el concepto arquitectónico. Es la "autopista" y las reglas de tráfico para que dos sistemas se comuniquen en la web usando HTTP.
-    Es un estándar de la industria. Utiliza los verbos HTTP estándar (GET, POST, PUT, DELETE) para intercambiar información (generalmente en formato JSON o XML).
+**Servicios REST** 
+Es el concepto arquitectónico. Es la "autopista" y las reglas de tráfico para que dos sistemas se comuniquen en la web usando HTTP.
+Es un estándar de la industria. Utiliza los verbos HTTP estándar (GET, POST, PUT, DELETE) para intercambiar información (generalmente en formato JSON o XML).
 ```
 
 ```
-UTL_HTTP: 	
-	Es una herramienta interna de la base de datos Oracle para consumir (llamar) servicios REST externos.
-  	Actuar como un cliente web o navegador dentro de PL/SQL.
-	Requiere configurar la seguridad de la base de datos (ACLs - Access Control Lists) y si el sitio es HTTPS, debes configurar un Oracle Wallet con los certificados de seguridad.
+**UTL_HTTP**
+Es una herramienta interna de la base de datos Oracle para consumir (llamar) servicios REST externos.
+Actua como un cliente web o navegador dentro de PL/SQL.
+Requiere configurar la seguridad de la base de datos (ACLs - Access Control Lists) y si el sitio es HTTPS, debes configurar un Oracle Wallet con los certificados de seguridad.
 
-	Operaciones:
-	GET: Traer información de una API externa (por ejemplo, consultar el clima actual o el tipo de cambio).
-	POST / PUT: Enviar datos de tus tablas a un sistema externo (por ejemplo, procesar un pago con Stripe o enviar un lead a un CRM).
-	DELETE: Solicitar la eliminación de un recurso en un servidor externo.
+Operaciones:
+GET: Traer información de una API externa (por ejemplo, consultar el clima actual o el tipo de cambio).
+POST / PUT: Enviar datos de tus tablas a un sistema externo (por ejemplo, procesar un pago con Stripe o enviar un lead a un CRM).
+DELETE: Solicitar la eliminación de un recurso en un servidor externo.
 ```
 
 ```
-ORDS (Oracle REST Data Services): 	
-	Es una herramienta de Oracle para crear (publicar) servicios REST a partir de tus datos y procedimientos almacenados.
-	Actuar como una puerta de enlace (API Gateway) para la base de datos.
-	Es un puente Java que se coloca frente a tu base de datos Oracle.
-	Traduce las peticiones HTTP/REST que envían aplicaciones externas en consultas SQL o ejecuciones PL/SQL dentro de la base de datos, y luego devuelve el resultado en formato JSON.
+**ORDS (Oracle REST Data Services)**
+Es una herramienta de Oracle para crear (publicar) servicios REST a partir de tus datos y procedimientos almacenados.
+Actua como una puerta de enlace (API Gateway) para la base de datos.
+Es un puente Java que se coloca frente a tu base de datos Oracle.
+Traduce las peticiones HTTP/REST que envían aplicaciones externas en consultas SQL o ejecuciones PL/SQL dentro de la base de datos, y luego devuelve el resultado en formato JSON.
 	
-	Operaciones:
-	GET: Una app externa consulta datos de tus tablas (ej. GET /ords/hr/employees/).
-	POST / PUT: Una app externa inserta o actualiza registros en tus tablas (ej. registrar un nuevo usuario).
-	DELETE: Una app externa borra registros mediante una petición HTTP.
+Operaciones:
+GET: Una app externa consulta datos de tus tablas (ej. GET /ords/hr/employees/).
+POST / PUT: Una app externa inserta o actualiza registros en tus tablas (ej. registrar un nuevo usuario).
+DELETE: Una app externa borra registros mediante una petición HTTP.
 ```
 
 ```
