@@ -5,7 +5,6 @@ Proyecto completo que **consume una API pública desde Oracle Autonomous Databas
 ![Oracle](https://img.shields.io/badge/Oracle-Autonomous%20DB-F80000?logo=oracle&logoColor=white)
 ![ORDS](https://img.shields.io/badge/ORDS-REST-blue)
 ![PL/SQL](https://img.shields.io/badge/PL%2FSQL-UTL__HTTP-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Contenido
 
@@ -16,11 +15,7 @@ Proyecto completo que **consume una API pública desde Oracle Autonomous Databas
 - [Instalación](#instalación)
 - [Carga automática](#carga-automática)
 - [API REST](#api-rest)
-- [Pruebas](#pruebas)
-- [Seguridad](#seguridad)
 - [Solución de problemas](#solución-de-problemas)
-- [Posibles mejoras](#posibles-mejoras)
-- [Licencia](#licencia)
 
 ## Qué hace
 
