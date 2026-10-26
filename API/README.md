@@ -2,39 +2,46 @@
 
 Proyecto que muestra las dos caras de las APIs REST en Oracle:
 
+```
 Servicios REST: 
 	Es el concepto arquitectónico. Es la "autopista" y las reglas de tráfico para que dos sistemas se comuniquen en la web usando HTTP.
     Es un estándar de la industria. Utiliza los verbos HTTP estándar (GET, POST, PUT, DELETE) para intercambiar información (generalmente en formato JSON o XML).
+```
 
+```
 UTL_HTTP: 	
 	Es una herramienta interna de la base de datos Oracle para consumir (llamar) servicios REST externos.
-  	Saliente (De la Base de Datos hacia el mundo exterior).
-	Actuar como un cliente web o navegador dentro de PL/SQL.
+  	Actuar como un cliente web o navegador dentro de PL/SQL.
 	Requiere configurar la seguridad de la base de datos (ACLs - Access Control Lists) y si el sitio es HTTPS, debes configurar un Oracle Wallet con los certificados de seguridad.
+
 	Operaciones:
 	GET: Traer información de una API externa (por ejemplo, consultar el clima actual o el tipo de cambio).
 	POST / PUT: Enviar datos de tus tablas a un sistema externo (por ejemplo, procesar un pago con Stripe o enviar un lead a un CRM).
 	DELETE: Solicitar la eliminación de un recurso en un servidor externo.
+```
 
-
+```
 ORDS (Oracle REST Data Services): 	
 	Es una herramienta de Oracle para crear (publicar) servicios REST a partir de tus datos y procedimientos almacenados.
-	Entrante (Del mundo exterior hacia la Base de Datos).
 	Actuar como una puerta de enlace (API Gateway) para la base de datos.
 	Es un puente Java que se coloca frente a tu base de datos Oracle.
 	Traduce las peticiones HTTP/REST que envían aplicaciones externas en consultas SQL o ejecuciones PL/SQL dentro de la base de datos, y luego devuelve el resultado en formato JSON.
-	Viene integrado con Oracle APEX, pero funciona de forma independiente para cualquier aplicación moderna (Angular, React, Node.js, etc.) que necesite interactuar con Oracle sin usar pesados drivers de base de datos.
+	
 	Operaciones:
 	GET: Una app externa consulta datos de tus tablas (ej. GET /ords/hr/employees/).
 	POST / PUT: Una app externa inserta o actualiza registros en tus tablas (ej. registrar un nuevo usuario).
 	DELETE: Una app externa borra registros mediante una petición HTTP.
+```
 
+```
 Cómo trabajan juntos (Ejemplo práctico)
 	Imagina que tienes un sistema de facturación en Oracle:
 		1. 	Una aplicación web de tus clientes necesita consultar una factura en tu base de datos. 
 			La app web hace una petición HTTP a ORDS, y ORDS le devuelve la factura en un Servicio REST.
 		2. 	Al mismo tiempo, tu base de datos necesita reportar esa factura al gobierno (Hacienda/DIAN/SAT). 
 			Tu código PL/SQL usa UTL_HTTP para enviar la factura al Servicio REST del gobierno.
+```
+
 
 | Parte | Oracle actúa como... | Tecnología | Qué hacemos |
 |-------|----------------------|------------|-------------|
