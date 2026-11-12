@@ -156,43 +156,87 @@
 	FROM productos
 	WHERE nombre = 'Teclado';
 
-
+########################################################################################################
 # JSON_TABLE: Consultar arrays JSON para extraer elementos individuales / Extraer contenido de un ARRAY
+########################################################################################################
 
-SELECT t.nombre, jt.codigo AS codigo, jt.precio as precio
-FROM productos t,
-JSON_TABLE(t.datos, '$'
-        COLUMNS (
-            codigo VARCHAR2(50) PATH '$.codigo',
-            precio NUMBER       PATH '$.precio'
-        )
-     ) jt
-WHERE t.nombre = 'Teclado';
+	SELECT t.nombre, jt.codigo AS codigo, jt.precio as precio
+	FROM productos t,
+	JSON_TABLE(t.datos, '$'
+			COLUMNS (
+				codigo VARCHAR2(50) PATH '$.codigo',
+				precio NUMBER       PATH '$.precio'
+			)
+		 ) jt
 
-SELECT 
-    t.id AS tabla_id,
-    t.nombre_sede,
-    j.tienda_json,
-    j.encargado,
-    j.producto_id,
-    j.producto_nombre,
-    j.precio,
-    j.stock
-FROM 
-    tiendas_inventario t,
-    JSON_TABLE(t.datos_json, '$'
-        COLUMNS (
-            tienda_json VARCHAR2(50) PATH '$.tienda',
-            encargado   VARCHAR2(50) PATH '$.encargado',
-            -- Desglosamos el array de productos en filas
-            NESTED PATH '$.productos[*]' COLUMNS (
-                producto_id     NUMBER        PATH '$.id_prod',
-                producto_nombre VARCHAR2(100) PATH '$.nombre',
-                precio          NUMBER        PATH '$.precio',
-                stock           NUMBER        PATH '$.stock'
-            )
-        )
-    ) j;
+
+-- Una fila por tag
+	SELECT t.nombre, jt.codigo AS codigo, jt.precio as precio, jt.tag as tags
+	FROM productos t,
+	JSON_TABLE(t.datos, '$'
+			COLUMNS (
+				codigo VARCHAR2(50) PATH '$.codigo',
+				precio NUMBER       PATH '$.precio',
+				NESTED PATH '$.tags[*]' 
+				 COLUMNS (
+					 tag VARCHAR2(100) PATH '$'
+					 )
+			)
+		 ) jt
+
+-- En una sola fila por registro
+	SELECT 
+		jt.codigo,
+		jt.precio,
+		jt.disponible,
+		LISTAGG(jt.tag, ', ') WITHIN GROUP (ORDER BY jt.orden) AS tags
+	FROM productos t
+	LEFT OUTER JOIN JSON_TABLE(
+		t.datos FORMAT JSON, 
+		'$' 
+		COLUMNS (
+			codigo     NUMBER        PATH '$.codigo',
+			precio     NUMBER(10, 2) PATH '$.precio',
+			disponible VARCHAR2(10)  PATH '$.disponible',
+			NESTED PATH '$.tags[*]' 
+			COLUMNS (
+				orden FOR ORDINALITY,
+				tag   VARCHAR2(100) PATH '$'
+			)
+		)
+	) jt ON 1=1
+	GROUP BY 
+		t.ROWID, 
+		jt.codigo, 
+		jt.precio, 
+		jt.disponible;
+
+
+	SELECT 
+		t.id AS tabla_id,
+		t.nombre_sede,
+		j.tienda_json,
+		j.encargado,
+		j.producto_id,
+		j.producto_nombre,
+		j.precio,
+		j.stock
+	FROM 
+		tiendas_inventario t,
+		JSON_TABLE(t.datos_json, '$'
+			COLUMNS (
+				tienda_json VARCHAR2(50) PATH '$.tienda',
+				encargado   VARCHAR2(50) PATH '$.encargado',
+				-- Desglosamos el array de productos en filas
+				NESTED PATH '$.productos[*]' COLUMNS (
+					producto_id     NUMBER        PATH '$.id_prod',
+					producto_nombre VARCHAR2(100) PATH '$.nombre',
+					precio          NUMBER        PATH '$.precio',
+					stock           NUMBER        PATH '$.stock'
+				)
+			)
+		) j;
+
 
 
 ###################
