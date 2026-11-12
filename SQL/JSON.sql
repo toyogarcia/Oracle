@@ -91,7 +91,7 @@
 ###################
 
 ########################################
-# JSON_VALUE: Extraer valores escalares 
+# JSON_VALUE: Extraer UN valor escalar 
 ########################################
 	SELECT 
 		nombre,
@@ -103,7 +103,7 @@
 	FROM productos
 	WHERE JSON_VALUE(datos, '$.precio') > 1000;
 
--- JSON_VALUE saca un unico valor escalar [], por eso hay que indicarle el indice
+-- JSON_VALUE saca un unico valor escalar , por eso hay que indicarle el indice con []
 	SELECT 
 		nombre,
 		JSON_VALUE(datos, '$.codigo')  AS codigo,
@@ -138,13 +138,24 @@
 		 JSON_TABLE(t.datos, '$.tags[*]' COLUMNS (tag VARCHAR2(100) PATH '$')) jt;
 
 
+########################################
+# JSON_QUERY: Extraer UNO O MAS valores (objetos/arrays)
+########################################
 
+	SELECT JSON_QUERY(datos, '$.tags') AS tags
+	FROM productos
+	WHERE nombre = 'Teclado';
 
-# JSON_QUERY: Extraer objetos/arrays
+	SELECT JSON_QUERY(datos, '$') AS registro
+	FROM productos
+	WHERE nombre = 'Teclado';
 
-SELECT JSON_QUERY(datos, '$.tags') AS tags
-FROM productos
-WHERE nombre = 'Teclado';
+-- Para extraer un solo valor escalar es necesaria la clausula WITH WRAPPER
+-- Debe especificarse para devolver un solo valor escalar (no un objeto JSON o un array JSON) o multiples valores de cualquier tipo.
+	SELECT JSON_QUERY(datos, '$.codigo' WITH WRAPPER) AS codigo
+	FROM productos
+	WHERE nombre = 'Teclado';
+
 
 # JSON_TABLE: Consultar arrays JSON para extraer elementos individuales / Extraer contenido de un ARRAY
 
