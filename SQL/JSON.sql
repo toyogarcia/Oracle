@@ -90,18 +90,54 @@
 # CONSULTA
 ###################
 
-
+########################################
 # JSON_VALUE: Extraer valores escalares 
+########################################
+	SELECT 
+		nombre,
+		JSON_VALUE(datos, '$.codigo') AS codigo,
+		JSON_VALUE(datos, '$.precio') AS precio
+	FROM productos;
 
-SELECT 
-    nombre,
-    JSON_VALUE(datos, '$.codigo') AS codigo,
-    JSON_VALUE(datos, '$.precio') AS precio
-FROM productos;
+	SELECT nombre, JSON_VALUE(datos, '$.precio') AS precio
+	FROM productos
+	WHERE JSON_VALUE(datos, '$.precio') > 1000;
 
-SELECT nombre, JSON_VALUE(datos, '$.precio') AS precio
-FROM productos
-WHERE JSON_VALUE(datos, '$.precio') > 1000;
+-- JSON_VALUE saca un unico valor escalar [], por eso hay que indicarle el indice
+	SELECT 
+		nombre,
+		JSON_VALUE(datos, '$.codigo')  AS codigo,
+		JSON_VALUE(datos, '$.precio')  AS precio,
+		JSON_VALUE(datos, '$.tags[0]') AS tags1,
+		JSON_VALUE(datos, '$.tags[1]') AS tags2
+	FROM productos;
+
+	SELECT 
+		nombre,
+		JSON_VALUE(datos, '$.codigo')  AS codigo,
+		JSON_VALUE(datos, '$.precio')  AS precio
+	FROM productos
+	where JSON_VALUE(datos, '$.tags[1]') = 'oferta'
+
+-- Para sacar todos los valores de tag en una linea
+	SELECT 
+		JSON_VALUE(datos, '$.codigo') AS codigo,
+		(
+			SELECT LISTAGG(jt.tag, ', ') WITHIN GROUP (ORDER BY ROWNUM)
+			FROM JSON_TABLE(
+				t.datos, 
+				'$.tags[*]' 
+				COLUMNS (tag VARCHAR2(100) PATH '$')
+			) jt
+		) AS todos_los_tags
+	FROM productos t;
+
+-- Para sacar un solo valor de tag por linea
+	SELECT JSON_VALUE(datos, '$.codigo') AS codigo, jt.tag
+	FROM productos t,
+		 JSON_TABLE(t.datos, '$.tags[*]' COLUMNS (tag VARCHAR2(100) PATH '$')) jt;
+
+
 
 
 # JSON_QUERY: Extraer objetos/arrays
