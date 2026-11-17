@@ -140,6 +140,9 @@
 
 ########################################
 # JSON_QUERY: Extraer UNO O MAS valores (objetos/arrays)
+#             Devuelve un fragmento de JSON (un objeto {...} o un array [...])
+#             Se usa típicamente en la cláusula SELECT para extraer una porción estructurada del documento JSON.
+#             Ideal cuando quieres conservar la estructura JSON (objeto o array) para enviarla a otra capa de la aplicación o procesarla sin convertirla a filas relacionales.
 ########################################
 
 	SELECT JSON_QUERY(datos, '$.tags') AS tags
@@ -158,6 +161,9 @@
 
 ########################################################################################################
 # JSON_TABLE: Consultar arrays JSON para extraer elementos individuales / Extraer contenido de un ARRAY
+#             Devuelve una tabla virtual (conjunto de filas y columnas) relacional.
+#             Se utiliza en la cláusula FROM (a menudo mediante un JOIN)
+#             Es la función más potente para "desmenuzar" (shred) un documento JSON y transformar arrays de objetos o estructuras complejas en múltiples filas y columnas de tipo SQL tradicional (números, textos, fechas).
 ########################################################################################################
 
 	SELECT t.nombre, jt.codigo AS codigo, jt.precio as precio
